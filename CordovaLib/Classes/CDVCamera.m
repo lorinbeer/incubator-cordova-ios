@@ -302,13 +302,15 @@ static NSSet* org_apache_cordova_validArrowDirections;
             }
             while ([fileMgr fileExistsAtPath: filePath]);
             
+            NSString * jsonMeta = nil;
             // save file
             if (![data writeToFile: filePath options: NSAtomicWrite error: &err]) {
                 result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString: [err localizedDescription]];
                 jsString = [result toErrorCallbackString:callbackId];
             } else {
-                [self packMetaData: filePath: info];
-                result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString: [[NSURL fileURLWithPath: filePath] absoluteString]];
+                //returns meta data as json dict
+                jsonMeta = [self packMetaData: filePath: info];
+                result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString: jsonMeta ? jsonMeta:[[NSURL fileURLWithPath: filePath] absoluteString]];
                 jsString = [result toSuccessCallbackString:callbackId];
             }
             
@@ -560,25 +562,21 @@ static NSSet* org_apache_cordova_validArrowDirections;
 /**
  * workaround to CB-1246
  */
-- (NSString *) packMetaData: (NSString *) imagepath: (NSDictionary *) info {
+- (NSString *) packMetaData: (NSString *) filePath: (NSDictionary *) info {
     NSMutableDictionary * mutemeta = [NSMutableDictionary dictionaryWithDictionary: [info objectForKey: UIImagePickerControllerMediaMetadata]];
-    [mutemeta setObject: imagepath forKey: @"file_uri"];
+    [mutemeta setObject: [[NSURL fileURLWithPath: filePath] absoluteString]  forKey: @"file_uri"];
     NSError *error;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject: mutemeta
-                                                       options:NSJSONWritingPrettyPrinted // Pass 0 if you don't care about the readability of the generated string
-                                                         error:&error];
-    NSString *jsonString;
+                                                       options:0
+                                                       error:&error];
+    NSString *jsonString = nil;
     if (! jsonData) {
-        NSLog(@"Got an error: %@", error);
+        NSLog(@"CB-1246 Debug: %@", error.debugDescription);
     } else {
-        jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        jsonString = [[NSString alloc] initWithData:jsonData encoding:NSASCIIStringEncoding];
     }
-    
-    
-    NSLog(@"%@",jsonString);
-    return @"";
+    return jsonString;
 }
-
 @end
 
 
