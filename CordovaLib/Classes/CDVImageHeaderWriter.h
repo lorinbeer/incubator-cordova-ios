@@ -32,7 +32,7 @@
               withElementData: (NSString*) data
               withExternalDataBlock: (NSDictionary*) memblock;
 
-- (void) decimalToUnsignedRational: (NSNumber *) numb
+- (NSString*) decimalToUnsignedRational: (NSNumber *) numb
          outputNumerator: (NSNumber *) num
          outputDenominator: (NSNumber*) deno;
 

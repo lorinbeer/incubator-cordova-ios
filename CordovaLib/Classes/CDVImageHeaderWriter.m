@@ -228,9 +228,10 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
  */
 - (NSString*) createIFDElementDataWithFormat: (NSArray*) dataformat withData: (NSString*) data {
     NSMutableString * datastr = NULL;
+    NSNumber * numerator = nil;
+    NSNumber * denominator = nil;
     NSNumber * formatcode = [dataformat objectAtIndex:1];
-    NSNumber * componentcount = [dataformat objectAtIndex:2];
-            
+    
     switch ([formatcode intValue]) {
         case EDT_UBYTE:
             break;
@@ -253,13 +254,9 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
          //   numb = [NSNumber numberWithUnsignedLong:[data intValue]];
           //  return [NSString stringWithFormat : @"%lx", [numb longValue]];
         case EDT_URATIONAL:
-            //int * numb = null;
-           // [self decimalToUnsignedRational: [NSNumber numberWithDouble:[data doubleValue]]
-        //                    outputNumerator: numerator
-        //                  outputDenominator: denominator];
-          //  long l = [numerator longValue];
-         //   l = [denominator longValue];
-            return @"0000000100000001";
+            return [self decimalToUnsignedRational: [NSNumber numberWithDouble:[data doubleValue]]
+                            outputNumerator: numerator
+                          outputDenominator: denominator];
         case EDT_SBYTE:
             
             break;
@@ -317,23 +314,48 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
 }
 
 // approximate a decimal with an unsigned rational by method of continued fraction
-- (void) decimalToUnsignedRational: (NSNumber *) numb outputNumerator: (NSNumber *) num outputDenominator: (NSNumber*) deno {
+- (NSString*) decimalToUnsignedRational: (NSNumber *) numb outputNumerator: (NSNumber *) num outputDenominator: (NSNumber*) deno {
     num = [NSNumber numberWithUnsignedLong: 1];
     deno = [NSNumber numberWithUnsignedLong: 1];
 
     //calculate initial values
-    int term = [numb intValue]; 
-    double recip = 1 / [numb doubleValue];
+    int term = [numb intValue];
     double error = [numb doubleValue] - term;
 
-    // calculate inverse
-    // split 
-
+    NSMutableArray * fractionlist = [[NSMutableArray alloc] initWithCapacity:8];
+    [self continuedFraction: [numb doubleValue] withFractionList:fractionlist];
+    
+    return [self formatFractionList: fractionlist];
 }
 
-- (void) continuedFraction: (double) val {
-    int rightside, leftside;
-    [self splitDouble: val rightSide: &rightside leftSide: &leftside];
+
+- (void) continuedFraction: (double) val withFractionList:(NSMutableArray*) fractionlist {
+    int whole, remainder;
+    // 1. split term
+    [self splitDouble: val rightSide: &whole leftSide: &remainder];
+    [fractionlist addObject: [NSNumber numberWithInt:whole]];
+    
+    // 2. calculate reciprocal of remainder
+    if (!remainder) return; // early exit, exact fraction found
+    double recip = 1 / remainder;
+
+    // 3. exit condition
+    if ([fractionlist count] > 8) {
+        return;
+    }
+    
+    // 4. recurse
+    [self continuedFraction:remainder withFractionList: fractionlist];
+    
+}
+
+- (NSString*) formatFractionList: (NSArray *) fractionlist {
+    NSMutableString * str = [[NSMutableString alloc] initWithCapacity:16];
+    
+    if ([fractionlist count] == 1){
+        [str appendFormat: @"%08x00000001", [[fractionlist objectAtIndex:0] intValue]];
+    }
+    return str;
 }
 
 // split a floating point number into two integer values representing the left and right side of the decimal
