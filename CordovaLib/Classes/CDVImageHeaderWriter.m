@@ -32,13 +32,11 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
                         TAGINF(@"0132", [NSNumber numberWithInt:EDT_ASCII_STRING], @20), @"DateTime",
                         TAGINF(@"010f", [NSNumber numberWithInt:EDT_ASCII_STRING], @0), @"Make",
                         TAGINF(@"0110", [NSNumber numberWithInt:EDT_ASCII_STRING], @0), @"Model",
-                   //     TAGINF(@"0131", [NSNumber numberWithInt:EDT_USHORT], @0), @"Software",
-                    
-                        //TAGINF(@"0112", [NSNumber numberWithInt:EDT_USHORT], @1), @"Orientation",
-                         
-                         /*
+                        TAGINF(@"0131", [NSNumber numberWithInt:EDT_ASCII_STRING], @0), @"Software",
                         TAGINF(@"011a", [NSNumber numberWithInt:EDT_URATIONAL], @1), @"XResolution",
                         TAGINF(@"011b", [NSNumber numberWithInt:EDT_URATIONAL], @1), @"YResolution",
+                         /*
+                        TAGINF(@"0112", [NSNumber numberWithInt:EDT_USHORT], @1), @"Orientation",
                         TAGINF(@"0128", [NSNumber numberWithInt:EDT_USHORT], @1), @"ResolutionUnit",
                         TAGINF(@"013e", [NSNumber numberWithInt:EDT_URATIONAL], @2), @"WhitePoint",
                         TAGINF(@"013f", [NSNumber numberWithInt:EDT_URATIONAL], @6), @"PrimaryChromaticities",
@@ -47,7 +45,7 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
                         TAGINF(@"0214", [NSNumber numberWithInt:EDT_URATIONAL], @6), @"ReferenceBlackWhite",
                         TAGINF(@"8298", [NSNumber numberWithInt:EDT_URATIONAL], @0), @"Copyright",
                         TAGINF(@"8769", [NSNumber numberWithInt:EDT_ULONG], @1), @"ExifOffset",
-                          */
+                        */
                         nil];
 
     // supported tages for exif subIFD
@@ -164,7 +162,7 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
     
     int addr = 10+12*[ifddatablock count];//;8 + (12 * ([ifdblock count]+1));
     for (int i = 0; i < [ifdblock count]; i++) {
-        NSLog(@"%d",i);
+
         NSString * entry = [ifdblock objectAtIndex:i];
         NSString * data = [ifddatablock objectAtIndex:i];
         
@@ -213,12 +211,15 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
     return NULL;
 }
 
-
+/*
 
 - (void) createTagDataHelper: (NSString *) tagname withTagCode: (NSInteger) tagcode {
     NSMutableString * datastr = [NSMutableString alloc];
     [datastr appendFormat: @"%@, tagcode", tagname];
 }
+*/
+
+
 
 /**
  * formatIFHElementData
@@ -236,7 +237,11 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
         case EDT_ASCII_STRING:
             datastr = [[NSMutableString alloc] init];
             for (int i = 0; i < [data length]; i++) {
-                [datastr appendFormat:@"%x",[data characterAtIndex:i]];
+                [datastr appendFormat:@"%02x",[data characterAtIndex:i]];
+            }
+            if ([datastr length] < 8) {
+                NSString * format = [NSString stringWithFormat:@"%%0%dd", 8 - [datastr length]];
+                [datastr appendFormat:format,0];
             }
             return datastr;
         case EDT_USHORT:
