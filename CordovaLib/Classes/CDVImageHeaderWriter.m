@@ -111,7 +111,7 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
     exifIFD = [self createExifIFDFromDict: [datadict objectForKey:@"{TIFF}"] withFormatDict: IFD0TagFormatDict isIFD0:YES];
 
     //data labeled as EXIF in UIImagePickerControllerMediaMetaData is part of the EXIF Sub IFD portion of APP1
-    subExifIFD = [self createExifIFDFromDict: [datadict objectForKey:@"{EXIF}"] withFormatDict: SubIFDTagFormatDict isIFD0:NO];
+    subExifIFD = [self createExifIFDFromDict: [datadict objectForKey:@"{Exif}"] withFormatDict: SubIFDTagFormatDict isIFD0:NO];
   /*  app1 = [[NSString alloc] initWithFormat:@"%@%04x%@%@%@%@",
                 app1marker,
                 ([exif length]/2)+16,
@@ -138,14 +138,19 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
             exifIFD,
             subExifIFD];
 */
+    NSLog(@"%@ \n %d",subExifIFD,[subExifIFD length]);
+    
+
     app1 = [[NSMutableString alloc] initWithFormat: @"%@%04x%@%@%@%@",
             app1marker,
-            16+[exifIFD length]/2+[subExifIFD length]/2,
+            16+[exifIFD length]/2 /*+[subExifIFD length]/2*/,
             exifmarker,
             tiffheader,
             ifd0offset,
             exifIFD];
+    
     NSLog(@"%@",app1);
+    
     return app1;
 }
 
@@ -156,9 +161,13 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
  */
 - (NSString*) createExifIFDFromDict : (NSDictionary*) datadict withFormatDict : (NSDictionary*) formatdict isIFD0 : (BOOL) ifd0flag {
     NSArray * datakeys = [datadict allKeys];
-    NSArray * knownkeys = [IFD0TagFormatDict allKeys]; // only keys in knowkeys are considered for entry in this IFD
+    NSArray * knownkeys = [formatdict  allKeys]; // only keys in knowkeys are considered for entry in this IFD
     NSMutableArray * ifdblock = [[NSMutableArray alloc] initWithCapacity: [datadict count]];
     NSMutableArray * ifddatablock = [[NSMutableArray alloc] initWithCapacity: [datadict count]];
+    ifd0flag = NO;
+    
+    NSLog(@"%@",[datadict description]);
+
     
     for (int i = 0; i < [datakeys count]; i++) {
         NSString * key = [datakeys objectAtIndex:i];
@@ -170,7 +179,7 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
             
             NSString * data = [self createIFDElementDataWithFormat: [formatdict objectForKey:key]
                                                    withData: [datadict objectForKey:key]];
-            NSLog(@"%@",entry);
+            NSLog(@"%@ %@",entry, data);
             if (entry) {
                 [ifdblock addObject:entry];
                 if(!data) {
@@ -189,9 +198,9 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
     int addr=0;
     if (ifd0flag) {
         // +1 for tag 0x8769, exifsubifd offset
-        addr = 10+(12*([ifddatablock count]+1));
+        addr = 14+(12*([ifddatablock count]+1));
     } else {
-        addr = 10+12*[ifddatablock count];
+        addr = 14+12*[ifddatablock count];
     }
     
     for (int i = 0; i < [ifdblock count]; i++) {
@@ -225,9 +234,8 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
     return [[NSString alloc] initWithFormat: @"%04x%@%@%@",
             entrycount,
             exifstr,
-            dbstr,
-            @"00000000"
-            ];
+            @"00000000",
+            dbstr];
 }
 
 
@@ -376,19 +384,20 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
 
     NSMutableArray * fractionlist = [[NSMutableArray alloc] initWithCapacity:8];
     [self continuedFraction: [numb doubleValue] withFractionList:fractionlist];
-    
+    [self expandContinuedFraction: fractionlist];
     return [self formatFractionList: fractionlist];
 }
 
 
 - (void) continuedFraction: (double) val withFractionList:(NSMutableArray*) fractionlist {
-    int whole, remainder;
+    int whole;
+    double remainder;
     // 1. split term
-    [self splitDouble: val rightSide: &whole leftSide: &remainder];
+    [self splitDouble: val withIntComponent: &whole withFloatRemainder: &remainder];
     [fractionlist addObject: [NSNumber numberWithInt:whole]];
     
     // 2. calculate reciprocal of remainder
-    if (!remainder) return; // early exit, exact fraction found
+    if (!remainder) return; // early exit, exact fraction found, avoids recip/0
     double recip = 1 / remainder;
 
     // 3. exit condition
@@ -397,7 +406,7 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
     }
     
     // 4. recurse
-    [self continuedFraction:remainder withFractionList: fractionlist];
+    [self continuedFraction:recip withFractionList: fractionlist];
     
 }
 
@@ -409,6 +418,32 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
        // [self op1: [arr objectAtIndex:i] withNumerator:]
     }
     
+}
+
+-(void) expandContinuedFraction: (NSArray*) fractionlist {
+    int i = 0;
+    int den = 0;
+    int num = 0;
+
+    //begin at the end of the list
+    i = [fractionlist count] - 1;
+    num = 1;
+    den = [fractionlist objectAtIndex:i];
+    
+    while (i > 0) {
+        int t = [fractionlist objectAtIndex: i-1];
+        num = t * den + num;
+        if (i==1) {
+            break;
+        } else {
+            t = num;
+            num = den;
+            den = t;
+        }
+        i--;
+    }
+    
+    NSLog(@"%d %d",den,num);
 }
 
 - (void) op1: (int) n withNumerator: (NSNumber*) num withDenominator: (NSNumber*) denom {
@@ -426,11 +461,11 @@ const uint mTiffLength = 0x2a; // after byte align bits, next to bits are 0x002a
 }
 
 // split a floating point number into two integer values representing the left and right side of the decimal
-- (void) splitDouble: (double) val rightSide: (int*) rightside leftSide: (int*) leftside {
+- (void) splitDouble: (double) val withIntComponent: (int*) rightside withFloatRemainder: (double*) leftside {
     *rightside = val; // convert numb to int representation, which truncates the decimal portion
-    double de = val - *rightside;
-    int digits = [[NSString stringWithFormat:@"%f", de] length] - 2;
-    *leftside =  de * pow(10,digits);;
+    *leftside = val - *rightside;
+//    int digits = [[NSString stringWithFormat:@"%f", de] length] - 2;
+//    *leftside =  de * pow(10,digits);;
 }
 
 
